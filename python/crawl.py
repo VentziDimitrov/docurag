@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Web Crawler for Technical Documentation.
+Standalone entry point for the web crawler.
 
-Uses BeautifulSoup4 for simple crawling with depth control.
+This script can be run directly from the command line.
 """
 
 import argparse
@@ -11,8 +11,8 @@ import logging
 import sys
 from pathlib import Path
 
-from .docu_crawler import DocumentationCrawler
-from .models import CrawlerConfig
+from docu_crawler import DocumentationCrawler
+from models import CrawlerConfig
 
 
 def setup_logging(verbose: bool = False) -> None:

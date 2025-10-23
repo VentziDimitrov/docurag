@@ -1,0 +1,142 @@
+# ===================================
+# DocuRAG Git Attributes
+# ===================================
+
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# ===================================
+# Source Code
+# ===================================
+
+# C# files
+*.cs text diff=csharp
+*.csx text diff=csharp
+*.csproj text
+*.sln text
+
+# JavaScript/TypeScript
+*.js text
+*.jsx text
+*.ts text
+*.tsx text
+*.json text
+*.mjs text
+
+# Python
+*.py text diff=python
+*.pyw text diff=python
+*.pyx text diff=python
+*.pxd text diff=python
+*.pxi text diff=python
+
+# Web files
+*.html text diff=html
+*.css text
+*.scss text
+*.sass text
+*.less text
+
+# Shell scripts
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Batch scripts
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# ===================================
+# Configuration Files
+# ===================================
+
+*.config text
+*.conf text
+*.ini text
+*.yaml text
+*.yml text
+*.toml text
+*.xml text
+*.props text
+*.targets text
+
+# ===================================
+# Documentation
+# ===================================
+
+*.md text diff=markdown
+*.txt text
+*.rst text
+*.adoc text
+
+# ===================================
+# Binary Files
+# ===================================
+
+# Images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+*.webp binary
+
+# Fonts
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+
+# Compiled files
+*.dll binary
+*.exe binary
+*.so binary
+*.dylib binary
+
+# Archives
+*.zip binary
+*.tar binary
+*.gz binary
+*.7z binary
+*.rar binary
+
+# Databases
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# ===================================
+# .NET Specific
+# ===================================
+
+*.sln text eol=crlf
+*.csproj text
+*.vbproj text
+*.vcxproj text
+*.vcproj text
+*.dbproj text
+*.fsproj text
+*.lsproj text
+*.wixproj text
+*.modelproj text
+*.sqlproj text
+*.wwaproj text
+
+# ===================================
+# Linguist Overrides
+# (for GitHub language statistics)
+# ===================================
+
+# Don't count generated files
+*.Designer.cs linguist-generated=true
+*.designer.cs linguist-generated=true
+*.g.cs linguist-generated=true
+*.g.i.cs linguist-generated=true
+*AssemblyInfo.cs linguist-generated=true
+*AssemblyAttributes.cs linguist-generated=true
+
+# Don't count vendor/third-party code
+frontend/node_modules/** linguist-vendored
+backend/packages/** linguist-vendored

@@ -1,6 +1,8 @@
 using Serilog;
 using backend.Services;
 using backend.Hubs;
+using backend.Configuration;
+using backend.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
 using Microsoft.Extensions.AI;
@@ -21,9 +23,61 @@ builder.Services.AddDbContext<DocumentDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddSignalR();
-builder.Services.AddHttpClient(); // used by our services
+builder.Services.AddHttpClient();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// --- Configure Settings with Options Pattern ---
+builder.Services.Configure<OpenAISettings>(
+    builder.Configuration.GetSection(OpenAISettings.SectionName))
+    .AddOptions<OpenAISettings>()
+    .Validate(settings =>
+    {
+        try
+        {
+            settings.Validate();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }, "OpenAI settings validation failed")
+    .ValidateOnStart();
+
+builder.Services.Configure<PineconeSettings>(
+    builder.Configuration.GetSection(PineconeSettings.SectionName))
+    .AddOptions<PineconeSettings>()
+    .Validate(settings =>
+    {
+        try
+        {
+            settings.Validate();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }, "Pinecone settings validation failed")
+    .ValidateOnStart();
+
+builder.Services.Configure<PythonSettings>(
+    builder.Configuration.GetSection(PythonSettings.SectionName))
+    .AddOptions<PythonSettings>()
+    .Validate(settings =>
+    {
+        try
+        {
+            settings.Validate();
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }, "Python settings validation failed")
+    .ValidateOnStart();
 
 // --- AI Services Configuration ---
 var openAiApiKey = builder.Configuration["OpenAI:ApiKey"];
@@ -40,7 +94,7 @@ builder.Services.AddSingleton<Kernel>(sp =>
 });
 
 // Register IEmbeddingGenerator using OpenAI
-#pragma warning disable SKEXP0010 // Type is for evaluation purposes only and is subject to change or removal in future updates
+#pragma warning disable SKEXP0010
 builder.Services.AddOpenAIEmbeddingGenerator(embeddingModel, openAiApiKey!);
 #pragma warning restore SKEXP0010
 
@@ -53,7 +107,7 @@ builder.Services.AddControllers();
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend", policy =>
+    options.AddPolicy(CorsPolicy.AllowFrontend, policy =>
     {
         policy.WithOrigins("http://localhost:3000", "http://localhost:5014")
               .AllowAnyHeader()
@@ -65,8 +119,8 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseSerilogRequestLogging();
-app.UseCors("AllowFrontend");
+app.UseCors(CorsPolicy.AllowFrontend);
 app.MapControllers();
-app.MapHub<CrawlerHub>("Hubs/CrawlerHub");
+app.MapHub<CrawlerHub>(HubRoutes.CrawlerHub);
 
 app.Run();

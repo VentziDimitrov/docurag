@@ -1,6 +1,8 @@
 using System.Text.Json;
-using backend.Models;
-using System.Collections.Generic;
+using backend.Models.DTOs;
+using backend.Models.Responses;
+using backend.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace backend.Services;
 
@@ -13,48 +15,67 @@ public class WebCrawlerService : IWebCrawlerService
 {
     private readonly IPythonExecutorService _pythonExecutor;
     private readonly ILogger<WebCrawlerService> _logger;
+    private readonly PythonSettings _pythonSettings;
     private readonly string _crawlerScriptPath;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public WebCrawlerService(
         IPythonExecutorService pythonExecutor,
-        IConfiguration configuration,
+        IOptions<PythonSettings> pythonSettings,
         ILogger<WebCrawlerService> logger)
     {
         _pythonExecutor = pythonExecutor;
         _logger = logger;
-        _crawlerScriptPath = configuration["Python:CrawlerScriptPath"] 
-            ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "Python", "web_crawler.py");
+        _pythonSettings = pythonSettings.Value;
+
+        // Use configured path or fallback to relative path
+        _crawlerScriptPath = !string.IsNullOrWhiteSpace(_pythonSettings.CrawlerScriptPath)
+            ? _pythonSettings.CrawlerScriptPath
+            : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "python", "crawl.py");
     }
 
     public async Task<CrawlResult> CrawlWebsiteAsync(string url, Func<CrawlStatus, Task> progressCallback)
     {
+        string? tempFilePath = null;
+
         try
         {
-            await progressCallback(new CrawlStatus 
-            { 
-                Status = "initializing", 
+            await progressCallback(new CrawlStatus
+            {
+                Status = "initializing",
                 Message = "Preparing to crawl website...",
-                Progress = 0 
+                Progress = 0
             });
+
+            // Create temp file path
+            tempFilePath = Path.Combine(Path.GetTempPath(), $"crawl_{Guid.NewGuid()}.json");
+            _logger.LogInformation("Starting crawl of {Url}, output to {TempFile}", url, tempFilePath);
 
             // Execute Python crawler script
             var arguments = new Dictionary<string, string>
             {
                 { "url", url },
-                { "output", Path.Combine(Path.GetTempPath(), $"crawl_{Guid.NewGuid()}.json") }
+                { "output", tempFilePath }
             };
 
-            await progressCallback(new CrawlStatus 
-            { 
-                Status = "crawling", 
+            await progressCallback(new CrawlStatus
+            {
+                Status = "crawling",
                 Message = "Crawling website and extracting content...",
-                Progress = 25 
+                Progress = 25
             });
 
             var result = await _pythonExecutor.ExecuteScriptAsync(_crawlerScriptPath, arguments);
 
             if (!result.Success)
             {
+                _logger.LogError("Crawler execution failed with exit code {ExitCode}: {Error}",
+                    result.ExitCode, result.Error);
+
                 return new CrawlResult
                 {
                     Success = false,
@@ -62,39 +83,42 @@ public class WebCrawlerService : IWebCrawlerService
                 };
             }
 
-            await progressCallback(new CrawlStatus 
-            { 
-                Status = "processing", 
+            await progressCallback(new CrawlStatus
+            {
+                Status = "processing",
                 Message = "Processing and indexing documents...",
-                Progress = 50 
+                Progress = 50
             });
 
             // Parse crawler output
-            var crawledData = ParseCrawlerOutput(arguments["output"]);
+            var crawledData = ParseCrawlerOutput(tempFilePath);
 
-            await progressCallback(new CrawlStatus 
-            { 
-                Status = "indexing", 
-                Message = "Creating embeddings and storing in vector database...",
-                Progress = 75 
-            });
-
-            // Process and store documents
-            //var processedCount = await _documentProcessor.ProcessDocumentsAsync(crawledData);
-
-            await progressCallback(new CrawlStatus 
-            { 
-                Status = "completed", 
-                Message = "Crawling completed successfully!",
-                Progress = 100 
-            });
-
-            // Cleanup temporary file
-            if (File.Exists(arguments["output"]))
+            if (crawledData.Count == 0)
             {
-                //File.Delete(arguments["output"]);
-                Console.WriteLine($"Temporary file retained for debugging: {arguments["output"]}");
+                _logger.LogWarning("No documents were crawled from {Url}", url);
+                return new CrawlResult
+                {
+                    Success = false,
+                    Error = "No documents were found to crawl"
+                };
             }
+
+            await progressCallback(new CrawlStatus
+            {
+                Status = "indexing",
+                Message = "Creating embeddings and storing in vector database...",
+                Progress = 75
+            });
+
+            await progressCallback(new CrawlStatus
+            {
+                Status = "completed",
+                Message = "Crawling completed successfully!",
+                Progress = 100
+            });
+
+            _logger.LogInformation("Successfully crawled {Count} documents from {Url}",
+                crawledData.Count, url);
 
             return new CrawlResult
             {
@@ -104,44 +128,76 @@ public class WebCrawlerService : IWebCrawlerService
                 Documents = crawledData
             };
         }
-        catch (Exception ex)
+        catch (JsonException ex)
         {
-            _logger.LogError(ex, "Error during web crawling");
+            _logger.LogError(ex, "Failed to parse crawler output JSON");
             return new CrawlResult
             {
                 Success = false,
-                Error = ex.Message
+                Error = "Invalid crawler output format"
             };
+        }
+        catch (IOException ex)
+        {
+            _logger.LogError(ex, "File I/O error during crawling");
+            return new CrawlResult
+            {
+                Success = false,
+                Error = "File operation failed during crawling"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during web crawling of {Url}", url);
+            return new CrawlResult
+            {
+                Success = false,
+                Error = $"Crawling failed: {ex.Message}"
+            };
+        }
+        finally
+        {
+            // Cleanup temporary file
+            if (!string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
+            {
+                try
+                {
+                    File.Delete(tempFilePath);
+                    _logger.LogDebug("Deleted temporary file {TempFile}", tempFilePath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to delete temporary file {TempFile}", tempFilePath);
+                }
+            }
         }
     }
 
     private List<CrawledDocument> ParseCrawlerOutput(string outputPath)
     {
-        try
+        if (!File.Exists(outputPath))
         {
-            var json = File.ReadAllText(outputPath);
-            return JsonSerializer.Deserialize<List<CrawledDocument>>(json) ?? new List<CrawledDocument>();
+            _logger.LogError("Crawler output file not found: {Path}", outputPath);
+            throw new FileNotFoundException($"Crawler output file not found: {outputPath}");
         }
-        catch (Exception ex)
+
+        var json = File.ReadAllText(outputPath);
+
+        if (string.IsNullOrWhiteSpace(json))
         {
-            _logger.LogError(ex, "Error parsing crawler output");
-            return new List<CrawledDocument>();
+            _logger.LogError("Crawler output file is empty: {Path}", outputPath);
+            return [];
         }
+
+        var crawlerOutput = JsonSerializer.Deserialize<CrawlerOutput>(json, JsonOptions);
+
+        if (crawlerOutput?.Documents == null)
+        {
+            _logger.LogWarning("No documents found in crawler output");
+            return [];
+        }
+
+        _logger.LogInformation("Parsed {Count} documents from crawler output", crawlerOutput.Documents.Count);
+        return crawlerOutput.Documents;
     }
-}
-
-public class CrawlResult
-{
-    public bool Success { get; set; }
-    public int DocumentsProcessed { get; set; }
-    public List<string> ProcessedUrls { get; set; } = new();
-    public List<CrawledDocument> Documents { get; set; } = new List<CrawledDocument>();
-    public string? Error { get; set; }
-}
-
-public class CrawlStatus
-{
-    public string Status { get; set; } = string.Empty;
-    public string Message { get; set; } = string.Empty;
-    public int Progress { get; set; }
 }

@@ -1,8 +1,9 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using backend.Models;
+using backend.Models.DTOs;
+using backend.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace backend.Services;
 
@@ -14,14 +15,19 @@ public interface IPythonExecutorService
 public class PythonExecutorService : IPythonExecutorService
 {
     private readonly ILogger<PythonExecutorService> _logger;
-    private readonly IConfiguration _configuration;
-    private readonly string _pythonPath;
+    private readonly PythonSettings _pythonSettings;
 
-    public PythonExecutorService(ILogger<PythonExecutorService> logger, IConfiguration configuration)
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    public PythonExecutorService(
+        ILogger<PythonExecutorService> logger,
+        IOptions<PythonSettings> pythonSettings)
     {
         _logger = logger;
-        _configuration = configuration;
-        _pythonPath = configuration["Python:ExecutablePath"] ?? "python3";
+        _pythonSettings = pythonSettings.Value;
     }
 
     public async Task<PythonExecutionResult> ExecuteScriptAsync(
@@ -30,9 +36,11 @@ public class PythonExecutorService : IPythonExecutorService
     {
         try
         {
+            _logger.LogInformation("Executing Python script: {ScriptPath}", scriptPath);
+
             var processStartInfo = new ProcessStartInfo
             {
-                FileName = _pythonPath,
+                FileName = _pythonSettings.ExecutablePath,
                 Arguments = BuildArguments(scriptPath, arguments),
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -70,23 +78,48 @@ public class PythonExecutorService : IPythonExecutorService
             await process.WaitForExitAsync();
 
             var output = outputBuilder.ToString();
-            //_logger.LogInformation("Python output: {Output}", output);
+            var errorOutput = errorBuilder.ToString();
+
+            _logger.LogDebug("Python stdout: {Output}", output);
+
+            if (!string.IsNullOrWhiteSpace(errorOutput))
+            {
+                _logger.LogWarning("Python stderr: {Error}", errorOutput);
+            }
+
+            var crawlerOutput = string.IsNullOrWhiteSpace(output)
+                ? new CrawlerOutput()
+                : JsonSerializer.Deserialize<CrawlerOutput>(output, JsonOptions) ?? new CrawlerOutput();
 
             var result = new PythonExecutionResult
             {
                 ExitCode = process.ExitCode,
-                Output = JsonSerializer.Deserialize<CrawRawObject>(output ?? "{}") ?? new CrawRawObject(),
-                Error = errorBuilder.ToString(),
+                Output = crawlerOutput,
+                Error = errorOutput,
                 Success = process.ExitCode == 0
             };
 
             if (!result.Success)
             {
-                _logger.LogError("Python script failed with exit code {ExitCode}: {Error}", 
+                _logger.LogError("Python script failed with exit code {ExitCode}: {Error}",
                     result.ExitCode, result.Error);
+            }
+            else
+            {
+                _logger.LogInformation("Python script completed successfully");
             }
 
             return result;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Failed to parse Python script output as JSON");
+            return new PythonExecutionResult
+            {
+                Success = false,
+                Error = $"Invalid JSON output: {ex.Message}",
+                ExitCode = -1
+            };
         }
         catch (Exception ex)
         {
@@ -103,29 +136,13 @@ public class PythonExecutorService : IPythonExecutorService
     private string BuildArguments(string scriptPath, Dictionary<string, string> arguments)
     {
         var args = new StringBuilder($"\"{scriptPath}\"");
-        
+
         foreach (var arg in arguments)
         {
             args.Append($" --{arg.Key} \"{arg.Value}\"");
         }
 
+        _logger.LogDebug("Python arguments: {Arguments}", args.ToString());
         return args.ToString();
     }
-}
-
-public class CrawRawObject
-{
-    [JsonPropertyName("docs")]
-    public List<CrawledDocument> Documents { get; set; } = new();
-
-    [JsonPropertyName("status")]
-    public string Status { get; set; } = string.Empty;
-}
-
-public class PythonExecutionResult
-{
-    public bool Success { get; set; }
-    public int ExitCode { get; set; }
-    public object Output { get; set; } = new();
-    public string Error { get; set; } = string.Empty;
 }

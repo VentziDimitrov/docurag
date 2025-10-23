@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using backend.Models; 
+using backend.Models.Entities;
 
 namespace backend.Services;
 
@@ -10,7 +10,7 @@ public class DocumentDbContext : DbContext
     }
 
     public DbSet<ConversationMessage> Conversations { get; set; }
-    public DbSet<Models.Document> Documents { get; set; }
+    public DbSet<Document> Documents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,7 +29,7 @@ public class DocumentDbContext : DbContext
             entity.HasIndex(e => e.Timestamp);
         });
 
-        modelBuilder.Entity<Models.Document>(entity =>
+        modelBuilder.Entity<Document>(entity =>
         {
             entity.HasKey(e => e.Id);
             entity.Property(e => e.DocumentationName).IsRequired().HasMaxLength(200);

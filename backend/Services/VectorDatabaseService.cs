@@ -1,8 +1,8 @@
 using Pinecone;
-using backend.Models;
-using System.Text.RegularExpressions;
-using System.Linq;
+using backend.Models.DTOs;
+using backend.Configuration;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
 
 namespace backend.Services;
 
@@ -15,49 +15,24 @@ public interface IVectorDatabaseService
     EmbeddingGenerationOptions GetEmbeddingOptions();  
 }
 
-public class PineconeOptions
-{
-    public string ApiKey { get; set; } = string.Empty;
-    public string Model { get; set; } = string.Empty;
-    public string Region { get; set; } = string.Empty;
-    public int Dimension { get; set; } = 1536;
-    public string Namespace { get; set; } = "__default__";
-}
-
 /// <summary>
-/// Vector database service 
-/// - Pinecone
+/// Vector database service using Pinecone
 /// </summary>
 public class VectorDatabaseService : IVectorDatabaseService
 {
     private readonly ILogger<VectorDatabaseService> _logger;
     private readonly PineconeClient _pineconeClient;
-    private readonly PineconeOptions options;
+    private readonly PineconeSettings _settings;
 
     public VectorDatabaseService(
         ILogger<VectorDatabaseService> logger,
-        DocumentDbContext dbContext,
-        IConfiguration configuration)
+        IOptions<PineconeSettings> pineconeSettings)
     {
         _logger = logger;
-        
+        _settings = pineconeSettings.Value;
 
-        var apiKey = configuration["Pinecone:ApiKey"] ?? string.Empty;
-        var region = configuration["Pinecone:Region"] ?? "us-east-1";
-        var model = configuration["Pinecone:Model"] ?? "text-embedding-3-small";
-        var dimension = int.Parse(configuration["Pinecone:Dimension"] ?? "1536");
-        var namespacee = configuration["Pinecone:NNamespace"] ?? "__default__";
-
-        options = new PineconeOptions
-        {
-            ApiKey = apiKey,
-            Region = region,
-            Dimension = dimension,
-            Model = model,
-            Namespace = namespacee
-        };
-
-        _pineconeClient = new PineconeClient(apiKey);
+        _pineconeClient = new PineconeClient(_settings.ApiKey);
+        _logger.LogInformation("Initialized Pinecone client for region {Region}", _settings.Region);
     }
 
     public async Task<List<RetrievedDocument>> SearchAsync(string indexName, ReadOnlyMemory<float> vector, uint topK)
@@ -108,7 +83,8 @@ public class VectorDatabaseService : IVectorDatabaseService
             IndexClient? index = _pineconeClient.Index(indexName);
             if (index == null)
             {
-                _logger.LogInformation("No index found with name {DocumentId} in Pinecone", documentId);
+                _logger.LogError("No index found with name {DocumentId} in Pinecone", documentId);
+                return;
             }
 
             // Add content to metadata
@@ -131,7 +107,7 @@ public class VectorDatabaseService : IVectorDatabaseService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error storing document in Pinecone");
+            _logger.LogError(ex, "Error storing document in Pinecone: ");
             return;
         }
     }
@@ -158,27 +134,25 @@ public class VectorDatabaseService : IVectorDatabaseService
         try
         {
             IndexList indexes = await _pineconeClient.ListIndexesAsync();
-            if (indexes == null)
+            if (indexes == null || indexes.Indexes == null)
             {
                 _logger.LogError("Failed to retrieve index list from Pinecone.");
                 return;
             }
-
-#pragma warning disable CS8604 // Possible null reference argument.
             if (!indexes.Indexes.Any(i => i.Name == indexName))
             {
                 var createIndexRequest = await _pineconeClient.CreateIndexAsync(new CreateIndexRequest
                 {
                     Name = indexName,
                     VectorType = VectorType.Dense,
-                    Dimension = options.Dimension,
+                    Dimension = _settings.Dimension,
                     Metric = MetricType.Cosine,
                     Spec = new ServerlessIndexSpec
                     {
                         Serverless = new ServerlessSpec
                         {
                             Cloud = ServerlessSpecCloud.Aws,
-                            Region = options.Region
+                            Region = _settings.Region
                         }
                     },
                     // TODO: Rework on production
@@ -191,7 +165,6 @@ public class VectorDatabaseService : IVectorDatabaseService
                 }
                 _logger.LogInformation("Created Pinecone index: {IndexName}", indexName);
             }
-#pragma warning restore CS8604 // Possible null reference argument.
             else
             {
 
@@ -208,8 +181,8 @@ public class VectorDatabaseService : IVectorDatabaseService
     {
         return new EmbeddingGenerationOptions
         {
-            ModelId = options.Model,
-            Dimensions = options.Dimension
+            ModelId = _settings.Model,
+            Dimensions = _settings.Dimension
         };
     }
 

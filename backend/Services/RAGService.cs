@@ -2,11 +2,13 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
-using backend.Models;
-using backend.Services;
-using ChatResponse = backend.Models.ChatResponse;
-using ChatMessage = backend.Models.ChatMessage;
-using Document = backend.Models.Document;
+using backend.Models.DTOs;
+using backend.Models.Entities;
+using backend.Configuration;
+using backend.Common;
+using Microsoft.Extensions.Options;
+using ChatResponse = backend.Models.Responses.ChatResponse;
+using ChatMessage = backend.Models.DTOs.ChatMessage;
 
 namespace backend.Services;
 
@@ -24,10 +26,8 @@ public class RAGService : IRAGService
     private readonly IVectorDatabaseService _vectorDb;
     private readonly DocumentDbContext _dbContext;
     private readonly ILogger<RAGService> _logger;
-    private OpenAiOptions _options;
+    private readonly OpenAISettings _settings;
     private readonly IChatCompletionService _chatService;
-    private const int ChunkSize = 1000; // Characters per chunk
-    private const int ChunkOverlap = 200; // Overlap between chunks
 
     public RAGService(
         Kernel kernel,
@@ -35,18 +35,14 @@ public class RAGService : IRAGService
         IVectorDatabaseService vectorDb,
         DocumentDbContext dbContext,
         ILogger<RAGService> logger,
-        IConfiguration configuration)
+        IOptions<OpenAISettings> openAiSettings)
     {
         _kernel = kernel;
         _vectorDb = vectorDb;
         _dbContext = dbContext;
         _logger = logger;
-        _options = new OpenAiOptions
-        {
-            ApiKey = configuration["OpenAI:ApiKey"] ?? string.Empty,
-            Model = configuration["OpenAI:Model"] ?? string.Empty
-        };
-        
+        _settings = openAiSettings.Value;
+
         _chatService = _kernel.GetRequiredService<IChatCompletionService>();
         _embeddingGenerator = embeddingGenerator;
     }
@@ -61,7 +57,7 @@ public class RAGService : IRAGService
             var queryEmbedding = embeddingResult;
 
             // Retrieve relevant documents from vector database
-            var relevantDocs = await _vectorDb.SearchAsync(indexName, queryEmbedding.Vector, 3);
+            var relevantDocs = await _vectorDb.SearchAsync(indexName, queryEmbedding.Vector, RAGConstants.DefaultTopK);
 
             if (!relevantDocs.Any())
             {
@@ -92,11 +88,11 @@ public class RAGService : IRAGService
             return new ChatResponse
             {
                 Message = responseContent,
-                Sources = relevantDocs.Select(d => new DocumentSource
+                Sources = relevantDocs.Select(d => new backend.Models.Responses.DocumentSource
                 {
                     Title = d.Title,
                     Url = d.Url,
-                    Snippet = d.Content.Substring(0, Math.Min(200, d.Content.Length))
+                    Snippet = d.Content.Substring(0, Math.Min(RAGConstants.DefaultSnippetLength, d.Content.Length))
                 }).ToList(),
                 Success = true
             };
@@ -272,7 +268,7 @@ Answer the user's question based on the documentation provided above.
 
             chunks.Add(currentChunk.ToString());
 
-            var overlapText = GetOverlapText(paragraph, ChunkOverlap);
+            var overlapText = GetOverlapText(paragraph, RAGConstants.DefaultChunkOverlap);
             currentChunk.Clear();
             currentChunk.Append(overlapText); 
         }
@@ -301,12 +297,12 @@ Answer the user's question based on the documentation provided above.
         foreach (var paragraph in paragraphs)
         {
             // If adding this paragraph exceeds chunk size
-            if (currentChunk.Length + paragraph.Length > ChunkSize && currentChunk.Length > 0)
+            if (currentChunk.Length + paragraph.Length > RAGConstants.DefaultChunkSize && currentChunk.Length > 0)
             {
                 chunks.Add(currentChunk.ToString().Trim());
 
                 // Start new chunk with overlap from previous chunk
-                var overlapText = GetOverlapText(currentChunk.ToString(), ChunkOverlap);
+                var overlapText = GetOverlapText(currentChunk.ToString(), RAGConstants.DefaultChunkOverlap);
                 currentChunk.Clear();
                 currentChunk.Append(overlapText);
             }
@@ -368,13 +364,4 @@ Answer the user's question based on the documentation provided above.
             _logger.LogError(ex, "Error storing document metadata");
         }
     }
-}
-
-public class OpenAiOptions
-{
-    public string ApiKey { get; set; } = string.Empty;
-    public string Model { get; set; } = "gpt-4o-mini";
-    public double Temperature { get; set; } = 0.2;
-    public int MaxTokens { get; set; } = 500;
-    public double TopP { get; set; } = 1.0;
 }

@@ -1,0 +1,461 @@
+# ===================================
+# DocuRAG Application .gitignore
+# ===================================
+
+# ===================================
+# Frontend (React/Node.js)
+# ===================================
+
+# Dependencies
+frontend/node_modules/
+frontend/.pnp
+frontend/.pnp.js
+
+# Testing
+frontend/coverage/
+
+# Production
+frontend/build/
+frontend/dist/
+
+# Misc
+frontend/.DS_Store
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# IDE
+frontend/.idea/
+frontend/.vscode/
+frontend/*.swp
+frontend/*.swo
+frontend/*~
+
+# ===================================
+# Backend (C# / .NET)
+# ===================================
+
+# Build results
+backend/bin/
+backend/obj/
+backend/out/
+
+# Build folders
+backend/[Bb]in/
+backend/[Oo]bj/
+backend/[Ll]og/
+backend/[Ll]ogs/
+
+# Visual Studio cache/options
+backend/.vs/
+backend/*.suo
+backend/*.user
+backend/*.userosscache
+backend/*.sln.docstates
+
+# User-specific files
+backend/*.rsuser
+
+# Build Results of an ATL Project
+backend/[Dd]ebugPublic/
+backend/[Rr]elease/
+backend/[Rr]eleases/
+backend/x64/
+backend/x86/
+backend/[Ww][Ii][Nn]32/
+backend/[Aa][Rr][Mm]/
+backend/[Aa][Rr][Mm]64/
+backend/bld/
+backend/[Bb]in/
+backend/[Oo]bj/
+backend/[Ll]og/
+backend/[Ll]ogs/
+
+# NuGet Packages
+backend/*.nupkg
+backend/*.snupkg
+backend/**/[Pp]ackages/*
+backend/*.nuget.props
+backend/*.nuget.targets
+
+# Visual Studio profiler
+backend/*.psess
+backend/*.vsp
+backend/*.vspx
+backend/*.sap
+
+# ReSharper
+backend/_ReSharper*/
+backend/*.[Rr]e[Ss]harper
+backend/*.DotSettings.user
+
+# JustCode
+backend/.JustCode
+
+# TeamCity
+backend/_TeamCity*
+
+# DotCover
+backend/*.dotCover
+
+# AxoCover
+backend/.axoCover/*
+backend/!.axoCover/settings.json
+
+# Coverlet
+backend/coverage*.json
+backend/coverage*.xml
+backend/coverage*.info
+
+# Files built by Visual Studio
+backend/*_i.c
+backend/*_p.c
+backend/*_h.h
+backend/*.ilk
+backend/*.meta
+backend/*.obj
+backend/*.iobj
+backend/*.pch
+backend/*.pdb
+backend/*.ipdb
+backend/*.pgc
+backend/*.pgd
+backend/*.rsp
+backend/*.sbr
+backend/*.tlb
+backend/*.tli
+backend/*.tlh
+backend/*.tmp
+backend/*.tmp_proj
+backend/*_wpftmp.csproj
+backend/*.log
+backend/*.tlog
+backend/*.vspscc
+backend/*.vssscc
+backend/.builds
+backend/*.pidb
+backend/*.svclog
+backend/*.scc
+
+# Backup & report files from converting project file
+backend/_UpgradeReport_Files/
+backend/[Bb]ackup*/
+backend/UpgradeLog*.XML
+backend/UpgradeLog*.htm
+backend/ServiceFabricBackup/
+backend/*.rptproj.bak
+
+# Publish Profiles
+backend/PublishProfiles/
+backend/*.pubxml
+backend/*.publishsettings
+
+# ===================================
+# Python
+# ===================================
+
+# Byte-compiled / optimized / DLL files
+python/__pycache__/
+python/*.py[cod]
+python/*$py.class
+
+# C extensions
+python/*.so
+
+# Distribution / packaging
+python/.Python
+python/build/
+python/develop-eggs/
+python/dist/
+python/downloads/
+python/eggs/
+python/.eggs/
+python/lib/
+python/lib64/
+python/parts/
+python/sdist/
+python/var/
+python/wheels/
+python/share/python-wheels/
+python/*.egg-info/
+python/.installed.cfg
+python/*.egg
+python/MANIFEST
+
+# PyInstaller
+python/*.manifest
+python/*.spec
+
+# Unit test / coverage reports
+python/htmlcov/
+python/.tox/
+python/.nox/
+python/.coverage
+python/.coverage.*
+python/.cache
+python/nosetests.xml
+python/coverage.xml
+python/*.cover
+python/*.py,cover
+python/.hypothesis/
+python/.pytest_cache/
+python/cover/
+
+# Translations
+python/*.mo
+python/*.pot
+
+# Django stuff:
+python/*.log
+python/local_settings.py
+python/db.sqlite3
+python/db.sqlite3-journal
+
+# Flask stuff:
+python/instance/
+python/.webassets-cache
+
+# Scrapy stuff:
+python/.scrapy
+
+# Sphinx documentation
+python/docs/_build/
+
+# PyBuilder
+python/.pybuilder/
+python/target/
+
+# Jupyter Notebook
+python/.ipynb_checkpoints
+
+# IPython
+python/profile_default/
+python/ipython_config.py
+
+# pyenv
+python/.python-version
+
+# pipenv
+python/Pipfile.lock
+
+# PEP 582
+python/__pypackages__/
+
+# Celery stuff
+python/celerybeat-schedule
+python/celerybeat.pid
+
+# SageMath parsed files
+python/*.sage.py
+
+# Environments
+python/.env
+python/.venv
+python/env/
+python/venv/
+python/ENV/
+python/env.bak/
+python/venv.bak/
+
+# Spyder project settings
+python/.spyderproject
+python/.spyproject
+
+# Rope project settings
+python/.ropeproject
+
+# mkdocs documentation
+python/site
+
+# mypy
+python/.mypy_cache/
+python/.dmypy.json
+python/dmypy.json
+
+# Pyre type checker
+python/.pyre/
+
+# pytype static type analyzer
+python/.pytype/
+
+# Cython debug symbols
+python/cython_debug/
+
+# ===================================
+# Database
+# ===================================
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# ===================================
+# Logs
+# ===================================
+
+# Application logs
+logs/
+*.log
+log.txt
+
+# Serilog files
+backend/logs/
+backend/Logs/
+
+# ===================================
+# Temporary Files
+# ===================================
+
+# Temporary crawl files
+*.tmp
+/tmp/
+temp/
+crawl_*.json
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ===================================
+# IDE / Editors
+# ===================================
+
+# Visual Studio Code
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+
+# Vim
+*.swp
+*.swo
+*~
+.*.sw[a-p]
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# ===================================
+# Configuration & Secrets
+# ===================================
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Configuration files with secrets
+appsettings.Development.json
+appsettings.*.json
+!appsettings.json
+!appsettings.Example.json
+
+# API keys and secrets
+secrets.json
+*.key
+*.pem
+*.cert
+
+# ===================================
+# Build & Package Managers
+# ===================================
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+
+# ===================================
+# Documentation
+# ===================================
+
+# Generated documentation
+docs/_build/
+docs/.doctrees/
+
+# Keep important markdown files
+!README.md
+!IMPROVEMENTS.md
+!LICENSE.md
+
+# ===================================
+# Testing
+# ===================================
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# ===================================
+# Docker
+# ===================================
+
+# Docker volumes
+.docker/
+docker-compose.override.yml
+
+# ===================================
+# Custom Application Files
+# ===================================
+
+# Old backup files
+*.old
+*.bak
+*.backup
+
+# Migration backups
+backend/Migrations/*.Designer.cs.bak
+
+# Keep example/template files
+!*.example
+!*.template

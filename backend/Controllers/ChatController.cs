@@ -1,12 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using backend.Models;
+using backend.Models.Requests;
+using backend.Models.Responses;
+using backend.Models.DTOs;
 using backend.Services;
 using backend.Hubs;
-using System.Text.RegularExpressions;
+using backend.Common;
 
 namespace backend.Controllers;
 
+/// <summary>
+/// API controller for chat and web crawling operations
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class ChatController : ControllerBase
@@ -15,7 +20,6 @@ public class ChatController : ControllerBase
     private readonly IWebCrawlerService _crawlerService;
     private readonly IHubContext<CrawlerHub> _hubContext;
     private readonly ILogger<ChatController> _logger;
-    public string indexName { get; set; } = "beautifulsoup";
 
     public ChatController(
         IRAGService ragService,
@@ -32,28 +36,43 @@ public class ChatController : ControllerBase
     [HttpPost("crawl")]
     public async Task<ActionResult<ChatResponse>> OnCrawlPage([FromBody] CrawlRequest request)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         try
         {
-            indexName = request.IndexName;
-            var result = await HandleCrawlCommand(request.Url, request.ConnectionId);
+            _logger.LogInformation("Starting crawl for {Url} to index {IndexName}",
+                request.Url, request.IndexName);
 
+            var result = await HandleCrawlCommand(request.IndexName, request.Url, request.ConnectionId);
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error crawling the page");
-            return StatusCode(500, new { error = "An error occurred on crawling " + request.Url });
+            _logger.LogError(ex, "Error crawling the page {Url}", request.Url);
+            return StatusCode(500, new { error = $"An error occurred while crawling {request.Url}" });
         }
-
     }
 
     [HttpPost("message")]
     public async Task<ActionResult<ChatResponse>> OnMessage([FromBody] ChatRequest request)
     {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
         try
         {
-            // Regular RAG query
-            var response =  await _ragService.GenerateResponseAsync(indexName, request.Message, request.ConversationId);
+            _logger.LogInformation("Processing message for conversation {ConversationId}",
+                request.ConversationId);
+
+            // TODO: Extract index name from request or conversation context
+            const string indexName = "beautifulsoup"; // Temporary hardcoded value
+
+            var response = await _ragService.GenerateResponseAsync(indexName, request.Message, request.ConversationId);
             return Ok(response);
         }
         catch (Exception ex)
@@ -62,16 +81,14 @@ public class ChatController : ControllerBase
             return StatusCode(500, new { error = "An error occurred processing your message" });
         }
     }
-    
 
-
-    private async Task<ActionResult<ChatResponse>> HandleCrawlCommand(string url, string connectionId)
+    private async Task<ActionResult<ChatResponse>> HandleCrawlCommand(string indexName, string url, string connectionId)
     {
         try
         {
             // Send initial status update
             await _hubContext.Clients.Client(connectionId).SendAsync(
-                "CrawlStatusUpdate", 
+                HubMethods.CrawlStatusUpdate,
                 new { status = "starting", message = $"Starting to crawl {url}..." }
             );
 
@@ -80,76 +97,57 @@ public class ChatController : ControllerBase
             {
                 // Progress callback
                 await _hubContext.Clients.Client(connectionId).SendAsync(
-                    "CrawlStatusUpdate",
+                    HubMethods.CrawlStatusUpdate,
                     new { status = status.Status, message = status.Message, progress = status.Progress }
                 );
             });
 
+            if (!crawlResult.Success)
+            {
+                _logger.LogError("Crawl failed for {Url}: {Error}", url, crawlResult.Error);
+                await _hubContext.Clients.Client(connectionId).SendAsync(
+                    HubMethods.CrawlStatusUpdate,
+                    new { status = "failed", message = crawlResult.Error ?? "Crawling failed for unknown reasons" }
+                );
+
+                return BadRequest(new { error = crawlResult.Error ?? "Crawling failed" });
+            }
+
             var processed = await _ragService.ProcessDocumentsAsync(indexName, crawlResult.Documents);
 
-            if (crawlResult.Success)
-            {
-                await _hubContext.Clients.Client(connectionId).SendAsync(
-                    "CrawlStatusUpdate",
-                    new { 
-                        status = "completed", 
-                        message = $"Successfully crawled {processed} documents",
-                        documentsProcessed = processed
-                    }
-                );
-
-                return Ok(new ChatResponse
+            // At this point, crawl was successful
+            await _hubContext.Clients.Client(connectionId).SendAsync(
+                HubMethods.CrawlStatusUpdate,
+                new
                 {
-                    Message = $"Successfully crawled and indexed {crawlResult.DocumentsProcessed} documents from {url}",
-                    Sources = crawlResult.ProcessedUrls.Select(url => new DocumentSource
-                    {
-                        Url = url,
-                    }).ToList(),
-                    Success = true
-                });
-            }
-            else if(!string.IsNullOrEmpty(crawlResult.Error))
-            {
-                await _hubContext.Clients.Client(connectionId).SendAsync(
-                    "CrawlStatusUpdate",
-                    new { status = "failed", message = crawlResult.Error }
-                );
+                    status = "completed",
+                    message = $"Successfully crawled and indexed {processed} documents",
+                    documentsProcessed = processed
+                }
+            );
 
-                return BadRequest(new { error = crawlResult.Error });
-            } else
-            {
-                await _hubContext.Clients.Client(connectionId).SendAsync(
-                    "CrawlStatusUpdate",
-                    new { status = "failed", message = "Crawling failed for unknown reasons" }
-                );
+            _logger.LogInformation("Successfully processed {Count} documents from {Url} to index {IndexName}",
+                processed, url, indexName);
 
-                return BadRequest(new { error = "Crawling failed for unknown reasons" });
-            }
+            return Ok(new ChatResponse
+            {
+                Message = $"Successfully crawled and indexed {crawlResult.DocumentsProcessed} documents from {url}",
+                Sources = crawlResult.ProcessedUrls.Select(processedUrl => new DocumentSource
+                {
+                    Url = processedUrl
+                }).ToList(),
+                Success = true
+            });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during crawl operation");
+            _logger.LogError(ex, "Error during crawl operation for {Url}", url);
             await _hubContext.Clients.Client(connectionId).SendAsync(
-                "CrawlStatusUpdate",
+                HubMethods.CrawlStatusUpdate,
                 new { status = "error", message = "An error occurred during crawling" }
             );
-            
-            return StatusCode(500, new { error = "Crawling failed" });
+
+            return StatusCode(500, new { error = $"Crawling failed: {ex.Message}" });
         }
     }
-/* 
-    [HttpGet("history/{conversationId}")]
-    public async Task<ActionResult<List<ChatMessage>>> GetConversationHistory(string conversationId)
-    {
-        try
-        {
-            var history = await _ragService.GetConversationHistoryAsync(conversationId);
-            return Ok(history);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving conversation history");
-            return StatusCode(500, new { error = "Failed to retrieve history" });
-        }
-    } */
 }
