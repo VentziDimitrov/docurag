@@ -28,8 +28,8 @@ public class WebCrawlerService : IWebCrawlerService
         IOptions<PythonSettings> pythonSettings,
         ILogger<WebCrawlerService> logger)
     {
+         _logger = logger;
         _pythonExecutor = pythonExecutor;
-        _logger = logger;
         _pythonSettings = pythonSettings.Value;
 
         // Use configured path or fallback to relative path

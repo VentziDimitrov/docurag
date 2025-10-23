@@ -1,12 +1,9 @@
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using backend.Models.DTOs;
 using backend.Models.Entities;
-using backend.Configuration;
 using backend.Common;
-using Microsoft.Extensions.Options;
+using backend.Agents;
 using ChatResponse = backend.Models.Responses.ChatResponse;
 using ChatMessage = backend.Models.DTOs.ChatMessage;
 
@@ -21,30 +18,21 @@ public interface IRAGService
 
 public class RAGService : IRAGService
 {
-    private readonly Kernel _kernel;
-    private IEmbeddingGenerator<string, Embedding<float>> _embeddingGenerator;
+    private readonly IAIAgent _aiAgent;
     private readonly IVectorDatabaseService _vectorDb;
     private readonly DocumentDbContext _dbContext;
     private readonly ILogger<RAGService> _logger;
-    private readonly OpenAISettings _settings;
-    private readonly IChatCompletionService _chatService;
 
     public RAGService(
-        Kernel kernel,
-        IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+        IAIAgent aiAgent,
         IVectorDatabaseService vectorDb,
         DocumentDbContext dbContext,
-        ILogger<RAGService> logger,
-        IOptions<OpenAISettings> openAiSettings)
+        ILogger<RAGService> logger)
     {
-        _kernel = kernel;
+        _aiAgent = aiAgent;
         _vectorDb = vectorDb;
         _dbContext = dbContext;
         _logger = logger;
-        _settings = openAiSettings.Value;
-
-        _chatService = _kernel.GetRequiredService<IChatCompletionService>();
-        _embeddingGenerator = embeddingGenerator;
     }
 
     public async Task<ChatResponse> GenerateResponseAsync(string indexName, string query, string conversationId)
@@ -52,9 +40,9 @@ public class RAGService : IRAGService
         try
         {
             await _vectorDb.CreateIndexIfNotExists(indexName);
-            // Generate embedding for the query using Microsoft.Extensions.AI
-            var embeddingResult = await _embeddingGenerator.GenerateAsync(query);
-            var queryEmbedding = embeddingResult;
+
+            // Generate embedding for the query using AIAgent
+            var queryEmbedding = await _aiAgent.GenerateEmbeddingAsync(query);
 
             // Retrieve relevant documents from vector database
             var relevantDocs = await _vectorDb.SearchAsync(indexName, queryEmbedding.Vector, RAGConstants.DefaultTopK);
@@ -68,21 +56,16 @@ public class RAGService : IRAGService
                 };
             }
 
-            // Build context from retrieved documents
-            var context = BuildContext(relevantDocs);
+            // Build context from retrieved documents using AIAgent
+            var context = _aiAgent.BuildContextFromDocuments(relevantDocs);
 
-            // Create prompt with context
-            var prompt = BuildRAGPrompt(query, context);
+            // Create user prompt with context using AIAgent
+            var userPrompt = _aiAgent.BuildUserPrompt(query, context);
 
-            // Generate response
-            var chatHistory = new ChatHistory();
-            chatHistory.AddSystemMessage("You are a helpful technical documentation assistant. Answer questions based on the provided documentation context. If the answer isn't in the context, say so clearly.");
-            chatHistory.AddUserMessage(prompt);
-
-            var response = await _chatService.GetChatMessageContentAsync(chatHistory);
+            // Generate response using AIAgent (system prompt is built internally)
+            var responseContent = await _aiAgent.GenerateChatResponseAsync(userPrompt, context);
 
             // Save to conversation history
-            var responseContent = response.Content ?? string.Empty;
             await SaveConversationAsync(conversationId, query, responseContent, relevantDocs);
 
             return new ChatResponse
@@ -106,40 +89,6 @@ public class RAGService : IRAGService
                 Success = false
             };
         }
-    }
-
-    private string BuildContext(List<RetrievedDocument> documents)
-    {
-        var contextBuilder = new System.Text.StringBuilder();
-        contextBuilder.AppendLine("=== RELEVANT DOCUMENTATION ===\n");
-
-        for (int i = 0; i < documents.Count; i++)
-        {
-            var doc = documents[i];
-            contextBuilder.AppendLine($"[Document {i + 1}]");
-            contextBuilder.AppendLine($"Title: {doc.Title}");
-            contextBuilder.AppendLine($"URL: {doc.Url}");
-            contextBuilder.AppendLine($"Content: {doc.Content}");
-            contextBuilder.AppendLine($"Relevance Score: {doc.Score:F3}");
-            contextBuilder.AppendLine();
-        }
-
-        return contextBuilder.ToString();
-    }
-
-    private string BuildRAGPrompt(string query, string context)
-    {
-        return $@"{context}
-
-=== USER QUESTION ===
-{query}
-
-=== INSTRUCTIONS ===
-Answer the user's question based on the documentation provided above. 
-- Cite specific documents when referencing information
-- If the answer isn't in the documentation, clearly state that
-- Provide code examples if they appear in the documentation
-- Be concise but thorough";
     }
 
     private async Task SaveConversationAsync(
@@ -210,8 +159,8 @@ Answer the user's question based on the documentation provided above.
 
                 foreach (var (chunk, index) in chunks.Select((c, i) => (c, i)))
                 {
-                    // Generate embedding for chunk
-                    var embeddingResult = await _embeddingGenerator.GenerateAsync(chunk);
+                    // Generate embedding for chunk using AIAgent
+                    var embeddingResult = await _aiAgent.GenerateEmbeddingAsync(chunk);
 
                     // Create unique ID for chunk
                     var chunkId = $"{GenerateDocumentId(document.Url)}_{index}";

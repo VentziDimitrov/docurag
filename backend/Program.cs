@@ -1,12 +1,12 @@
 using Serilog;
 using backend.Services;
+using backend.Agents;
 using backend.Hubs;
 using backend.Configuration;
 using backend.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
 using Microsoft.Extensions.AI;
-using OpenAI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,6 +98,7 @@ builder.Services.AddSingleton<Kernel>(sp =>
 builder.Services.AddOpenAIEmbeddingGenerator(embeddingModel, openAiApiKey!);
 #pragma warning restore SKEXP0010
 
+builder.Services.AddScoped<IAIAgent, AIAgent>();
 builder.Services.AddScoped<IVectorDatabaseService, VectorDatabaseService>();
 builder.Services.AddScoped<IPythonExecutorService, PythonExecutorService>();
 builder.Services.AddScoped<IWebCrawlerService, WebCrawlerService>();
