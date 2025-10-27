@@ -24,6 +24,26 @@ public static class RAGConstants
     /// Default length of document snippets in characters
     /// </summary>
     public const int DefaultSnippetLength = 200;
+
+    /// <summary>
+    /// Multiplier for initial document retrieval before reranking
+    /// </summary>
+    public const uint ReRankMultiplier = 3;
+
+    /// <summary>
+    /// Minimum confidence score to consider a response reliable
+    /// </summary>
+    public const float MinConfidenceThreshold = 0.7f;
+
+    /// <summary>
+    /// Enable reranking of documents (can be disabled for performance)
+    /// </summary>
+    public const bool EnableReRanking = true;
+
+    /// <summary>
+    /// Enable confidence assessment (can be disabled for performance)
+    /// </summary>
+    public const bool EnableConfidenceAssessment = true;
 }
 
 /// <summary>

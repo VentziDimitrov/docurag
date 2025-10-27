@@ -44,7 +44,7 @@ docurag/
 - **Logging**: Serilog
 - **Real-time**: SignalR
 
-### Frontend
+### Frontend ===== UNDER CONSTRUCTION =====
 - **Framework**: React
 - **UI**: (To be configured)
 - **HTTP Client**: Axios
@@ -227,27 +227,6 @@ Content-Type: application/json
    - Retrieved context + user question sent to GPT-4
    - AI generates response based on documentation
 
-### Best Practices Implemented
-
-**Backend (C#)**:
-- ✅ Options Pattern for configuration
-- ✅ Dependency Injection throughout
-- ✅ Strongly-typed models with validation
-- ✅ Result pattern for error handling
-- ✅ Structured logging with Serilog
-- ✅ Proper resource management
-- ✅ Thread-safe controllers
-- ✅ Specific exception handling
-
-**Python**:
-- ✅ Type hints throughout
-- ✅ Dataclasses for models
-- ✅ Configuration validation
-- ✅ Logging instead of print
-- ✅ Proper error handling
-- ✅ Modular architecture
-
-See [backend/IMPROVEMENTS.md](backend/IMPROVEMENTS.md) for detailed backend improvements.
 
 ## 🔍 Configuration
 
@@ -334,70 +313,4 @@ python -m pytest
 - Check index name matches the crawl request
 - Ensure embeddings were generated successfully
 
-## 📝 Development
 
-### Adding a New Model
-
-1. Create file in appropriate folder:
-   - DTOs: `backend/Models/DTOs/`
-   - Entities: `backend/Models/Entities/`
-   - Requests: `backend/Models/Requests/`
-   - Responses: `backend/Models/Responses/`
-
-2. Use records for immutability:
-```csharp
-public record MyModel(string Property1, int Property2);
-```
-
-### Adding Configuration
-
-1. Create settings class in `backend/Configuration/`:
-```csharp
-public class MySettings
-{
-    public const string SectionName = "MySettings";
-    public string Value { get; set; }
-
-    public void Validate()
-    {
-        if (string.IsNullOrEmpty(Value))
-            throw new InvalidOperationException("Value is required");
-    }
-}
-```
-
-2. Register in `Program.cs`:
-```csharp
-builder.Services.Configure<MySettings>(
-    builder.Configuration.GetSection(MySettings.SectionName))
-    .AddOptions<MySettings>()
-    .Validate(s => { s.Validate(); return true; })
-    .ValidateOnStart();
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-[Your License Here]
-
-## 🙏 Acknowledgments
-
-- OpenAI for GPT and embeddings
-- Pinecone for vector database
-- Microsoft for Semantic Kernel
-- BeautifulSoup for HTML parsing
-
-## 📧 Contact
-
-[Your contact information]
-
----
-
-**Note**: This is a RAG system for technical documentation. Ensure you have permission to crawl and index any documentation websites you use.

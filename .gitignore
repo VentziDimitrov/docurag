@@ -52,13 +52,6 @@ backend/[Oo]bj/
 backend/[Ll]og/
 backend/[Ll]ogs/
 
-# Visual Studio cache/options
-backend/.vs/
-backend/*.suo
-backend/*.user
-backend/*.userosscache
-backend/*.sln.docstates
-
 # User-specific files
 backend/*.rsuser
 
@@ -84,64 +77,6 @@ backend/**/[Pp]ackages/*
 backend/*.nuget.props
 backend/*.nuget.targets
 
-# Visual Studio profiler
-backend/*.psess
-backend/*.vsp
-backend/*.vspx
-backend/*.sap
-
-# ReSharper
-backend/_ReSharper*/
-backend/*.[Rr]e[Ss]harper
-backend/*.DotSettings.user
-
-# JustCode
-backend/.JustCode
-
-# TeamCity
-backend/_TeamCity*
-
-# DotCover
-backend/*.dotCover
-
-# AxoCover
-backend/.axoCover/*
-backend/!.axoCover/settings.json
-
-# Coverlet
-backend/coverage*.json
-backend/coverage*.xml
-backend/coverage*.info
-
-# Files built by Visual Studio
-backend/*_i.c
-backend/*_p.c
-backend/*_h.h
-backend/*.ilk
-backend/*.meta
-backend/*.obj
-backend/*.iobj
-backend/*.pch
-backend/*.pdb
-backend/*.ipdb
-backend/*.pgc
-backend/*.pgd
-backend/*.rsp
-backend/*.sbr
-backend/*.tlb
-backend/*.tli
-backend/*.tlh
-backend/*.tmp
-backend/*.tmp_proj
-backend/*_wpftmp.csproj
-backend/*.log
-backend/*.tlog
-backend/*.vspscc
-backend/*.vssscc
-backend/.builds
-backend/*.pidb
-backend/*.svclog
-backend/*.scc
 
 # Backup & report files from converting project file
 backend/_UpgradeReport_Files/
@@ -329,45 +264,6 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
-# ===================================
-# IDE / Editors
-# ===================================
-
-# Visual Studio Code
-.vscode/
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/*.code-snippets
-
-# JetBrains IDEs
-.idea/
-*.iml
-*.iws
-*.ipr
-.idea_modules/
-
-# Vim
-*.swp
-*.swo
-*~
-.*.sw[a-p]
-
-# Emacs
-*~
-\#*\#
-/.emacs.desktop
-/.emacs.desktop.lock
-*.elc
-auto-save-list
-tramp
-.\#*
-
-# Sublime Text
-*.sublime-workspace
-*.sublime-project
 
 # ===================================
 # Configuration & Secrets

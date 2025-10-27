@@ -44,10 +44,13 @@ public class RAGService : IRAGService
             // Generate embedding for the query using AIAgent
             var queryEmbedding = await _aiAgent.GenerateEmbeddingAsync(query);
 
-            // Retrieve relevant documents from vector database
-            var relevantDocs = await _vectorDb.SearchAsync(indexName, queryEmbedding.Vector, RAGConstants.DefaultTopK);
+            // Retrieve relevant documents from vector database (get more than needed for reranking)
+            var initialTopK = RAGConstants.EnableReRanking
+                ? RAGConstants.DefaultTopK * RAGConstants.ReRankMultiplier
+                : RAGConstants.DefaultTopK;
+            var retrievedDocs = await _vectorDb.SearchAsync(indexName, queryEmbedding.Vector, initialTopK);
 
-            if (!relevantDocs.Any())
+            if (retrievedDocs.Count == 0)
             {
                 return new ChatResponse
                 {
@@ -56,28 +59,62 @@ public class RAGService : IRAGService
                 };
             }
 
-            // Build context from retrieved documents using AIAgent
-            var context = _aiAgent.BuildContextFromDocuments(relevantDocs);
+            // Re-rank documents using AI Agent for better relevance (if enabled)
+            List<RetrievedDocument> reRankedDocs;
+            if (RAGConstants.EnableReRanking && retrievedDocs.Count > RAGConstants.DefaultTopK)
+            {
+                _logger.LogInformation("Re-ranking {Count} documents to top {TopK}", retrievedDocs.Count, RAGConstants.DefaultTopK);
+                reRankedDocs = await _aiAgent.ReRankDocumentsAsync(query, retrievedDocs, (int)RAGConstants.DefaultTopK);
+            }
+            else
+            {
+                _logger.LogInformation("Using {Count} documents without re-ranking", retrievedDocs.Count);
+                reRankedDocs = retrievedDocs.Take((int)RAGConstants.DefaultTopK).ToList();
+            }
+
+            // Build context from re-ranked documents using AIAgent
+            var context = _aiAgent.BuildContextFromDocuments(reRankedDocs);
 
             // Create user prompt with context using AIAgent
             var userPrompt = _aiAgent.BuildUserPrompt(query, context);
 
             // Generate response using AIAgent (system prompt is built internally)
-            var responseContent = await _aiAgent.GenerateChatResponseAsync(userPrompt, context);
+            var responseContent = await _aiAgent.GenerateChatResponseAsync(userPrompt);
+
+            // Assess confidence in the generated response (self-calibration) if enabled
+            ConfidenceScore? confidence = null;
+            if (RAGConstants.EnableConfidenceAssessment)
+            {
+                _logger.LogInformation("Assessing response confidence");
+                confidence = await _aiAgent.AssessConfidenceAsync(query, responseContent, reRankedDocs);
+
+                if (confidence.Score < RAGConstants.MinConfidenceThreshold)
+                {
+                    _logger.LogWarning("Low confidence response: {Score:F2}. Reason: {Reasoning}",
+                        confidence.Score, confidence.Reasoning);
+                }
+            }
 
             // Save to conversation history
-            await SaveConversationAsync(conversationId, query, responseContent, relevantDocs);
+            await SaveConversationAsync(conversationId, query, responseContent, reRankedDocs);
 
             return new ChatResponse
             {
                 Message = responseContent,
-                Sources = relevantDocs.Select(d => new backend.Models.Responses.DocumentSource
+                Sources = reRankedDocs.Select(d => new backend.Models.Responses.DocumentSource
                 {
                     Title = d.Title,
                     Url = d.Url,
                     Snippet = d.Content.Substring(0, Math.Min(RAGConstants.DefaultSnippetLength, d.Content.Length))
                 }).ToList(),
-                Success = true
+                Success = true,
+                Confidence = confidence != null ? new backend.Models.Responses.ConfidenceInfo
+                {
+                    Score = confidence.Score,
+                    Reasoning = confidence.Reasoning,
+                    MissingInformation = confidence.MissingInformation,
+                    IsReliable = confidence.IsReliable
+                } : null
             };
         }
         catch (Exception ex)
